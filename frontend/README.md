@@ -2,6 +2,12 @@
 
 Mobile-first frontend (React + Vite + Tailwind CSS) dla aplikacji do inwentaryzacji stadionowej.
 
+## Panel koordynatora
+
+- Przycisk **Panel koordynatora** na ekranie startowym lub adres `/admin`
+- Domyślne hasło: `admin` (zmiana w `.env` → `VITE_ADMIN_PASSWORD=...`)
+- Po zalogowaniu sesja trwa do zamknięcia karty (sessionStorage)
+
 ## Ngrok — jeden tunel wystarczy
 
 Frontend i backend działają na osobnych portach (5173 i 8080). Zapytania API idą przez **proxy Vite** — React woła `/api/...`, a Vite przekazuje je do Javy na `localhost:8080`.

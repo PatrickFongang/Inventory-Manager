@@ -15,8 +15,11 @@ export async function fetchWorkers() {
   return response.json()
 }
 
-export async function fetchProducts(worker) {
-  const url = '/api/products?worker=' + encodeURIComponent(worker)
+export async function fetchProducts(worker, pendingOnly) {
+  let url = '/api/products?worker=' + encodeURIComponent(worker)
+  if (pendingOnly !== undefined) {
+    url += '&pendingOnly=' + pendingOnly
+  }
   const response = await fetch(url, {
     headers: NGROK_HEADERS,
   })
@@ -37,6 +40,53 @@ export async function submitInventory(entries) {
   return true
 }
 
+export async function saveDraft(entry) {
+  const response = await fetch('/api/inventory/draft', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(entry),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function updateInventoryEntry(entryId, quantity) {
+  const response = await fetch('/api/inventory/' + entryId, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify({ quantity }),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function fetchAdminOverview() {
+  const response = await fetch('/api/admin/overview', {
+    headers: NGROK_HEADERS,
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function updateProductAssignment(productId, assignedWorker) {
+  const response = await fetch('/api/products/' + productId, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify({ assignedWorker }),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
 export async function downloadExport() {
   const response = await fetch('/api/export', {
     headers: NGROK_HEADERS,
@@ -51,4 +101,13 @@ export async function downloadExport() {
   link.click()
   link.remove()
   window.URL.revokeObjectURL(url)
+}
+
+export async function resetInventory() {
+  const response = await fetch('/api/inventory', {
+    method: 'DELETE',
+    headers: NGROK_HEADERS,
+  })
+  await handleResponse(response)
+  return true
 }

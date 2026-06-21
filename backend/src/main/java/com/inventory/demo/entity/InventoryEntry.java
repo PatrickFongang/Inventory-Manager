@@ -7,10 +7,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Entity
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
 public class InventoryEntry {
 
     @Id
@@ -20,11 +26,17 @@ public class InventoryEntry {
     @Column(name = "product_name", nullable = false)
     private String productName;
 
+    @Column(name = "product_id")
+    private Long productId;
+
     @Column(name = "worker_name", nullable = false)
     private String workerName;
 
     @Column(nullable = false)
     private Double quantity;
+
+    @Column(name = "submitted", nullable = false)
+    private boolean submitted;
 
     @Column(name = "entry_timestamp", nullable = false)
     private LocalDateTime timestamp;

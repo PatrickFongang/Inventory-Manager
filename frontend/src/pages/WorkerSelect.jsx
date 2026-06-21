@@ -61,6 +61,15 @@ export default function WorkerSelect() {
           ))}
         </div>
       )}
+
+      <div className="mx-auto mt-12 max-w-md">
+        <button
+          onClick={() => navigate('/admin')}
+          className="w-full rounded-2xl border-2 border-slate-700 bg-slate-800/60 px-6 py-5 text-lg font-semibold text-slate-300 active:bg-slate-700"
+        >
+          Panel koordynatora
+        </button>
+      </div>
     </div>
   )
 }
