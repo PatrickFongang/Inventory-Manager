@@ -1,5 +1,7 @@
 package com.inventory.demo.dto;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,13 +11,12 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkerProductView {
+public class SectionView {
 
     private Long id;
     private String name;
-    private String sectionName;
     private Integer sortOrder;
-    private boolean submitted;
-    private Long entryId;
-    private Double quantity;
+
+    @Builder.Default
+    private List<WorkerView> workers = new ArrayList<>();
 }

@@ -1,9 +1,9 @@
 package com.inventory.demo.factory;
 
 import com.inventory.demo.dto.AdminOverviewResponse;
-import com.inventory.demo.dto.WorkerProductView;
 import com.inventory.demo.entity.InventoryEntry;
 import com.inventory.demo.entity.Product;
+import com.inventory.demo.entity.Section;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,23 +31,16 @@ public final class AdminOverviewFactory {
                 .build();
     }
 
-    public static AdminOverviewResponse.ProductAssignmentView productAssignment(Product product) {
-        return AdminOverviewResponse.ProductAssignmentView.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .assignedWorker(product.getAssignedWorker())
-                .sortOrder(product.getSortOrder())
-                .build();
-    }
-
-    public static AdminOverviewResponse.WorkerStatusView workerStatus(String worker,
-                                                                      List<Product> assignedProducts,
-                                                                      Map<Long, InventoryEntry> entriesByProductId) {
+    public static AdminOverviewResponse.SectionStatusView sectionStatus(Section section,
+                                                                        List<Product> sectionProducts,
+                                                                        Map<Long, InventoryEntry> entriesByProductId) {
         List<AdminOverviewResponse.SubmittedEntryView> entries = new ArrayList<>();
         List<AdminOverviewResponse.PendingProductView> pendingProducts = new ArrayList<>();
+        List<AdminOverviewResponse.EditableProductView> editableProducts = new ArrayList<>();
 
-        for (Product product : assignedProducts) {
+        for (Product product : sectionProducts) {
             InventoryEntry entry = entriesByProductId.get(product.getId());
+            editableProducts.add(editableProduct(product, entry));
             if (entry != null && entry.isSubmitted()) {
                 entries.add(submittedEntry(product, entry));
             } else {
@@ -55,21 +48,35 @@ public final class AdminOverviewFactory {
             }
         }
 
-        return AdminOverviewResponse.WorkerStatusView.builder()
-                .name(worker)
-                .totalProducts(assignedProducts.size())
+        return AdminOverviewResponse.SectionStatusView.builder()
+                .id(section.getId())
+                .name(section.getName())
+                .totalProducts(sectionProducts.size())
                 .completedCount(entries.size())
+                .workers(WorkerViewFactory.fromWorkers(section.getWorkers(), true))
                 .pendingProducts(pendingProducts)
                 .entries(entries)
+                .editableProducts(editableProducts)
                 .build();
     }
 
-    public static Map<String, List<Product>> groupProductsByWorker(List<Product> products) {
-        Map<String, List<Product>> productsByWorker = new HashMap<>();
+    public static AdminOverviewResponse.EditableProductView editableProduct(Product product,
+                                                                            InventoryEntry entry) {
+        return AdminOverviewResponse.EditableProductView.builder()
+                .productId(product.getId())
+                .productName(product.getName())
+                .entryId(entry != null ? entry.getId() : null)
+                .quantity(entry != null ? entry.getQuantity() : null)
+                .submitted(entry != null && entry.isSubmitted())
+                .build();
+    }
+
+    public static Map<String, List<Product>> groupProductsBySection(List<Product> products) {
+        Map<String, List<Product>> productsBySection = new HashMap<>();
         for (Product product : products) {
-            productsByWorker.computeIfAbsent(product.getAssignedWorker(), key -> new ArrayList<>())
+            productsBySection.computeIfAbsent(product.getSectionName(), key -> new ArrayList<>())
                     .add(product);
         }
-        return productsByWorker;
+        return productsBySection;
     }
 }

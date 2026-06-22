@@ -18,8 +18,8 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "assigned_worker", nullable = false)
-    private String assignedWorker;
+    @Column(name = "section_name", nullable = false)
+    private String sectionName;
 
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;

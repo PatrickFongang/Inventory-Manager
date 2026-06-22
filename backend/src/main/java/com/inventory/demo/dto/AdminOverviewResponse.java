@@ -14,25 +14,29 @@ import lombok.NoArgsConstructor;
 public class AdminOverviewResponse {
 
     @Builder.Default
-    private List<WorkerStatusView> workers = new ArrayList<>();
-
-    @Builder.Default
-    private List<ProductAssignmentView> products = new ArrayList<>();
+    private List<SectionStatusView> sections = new ArrayList<>();
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class WorkerStatusView {
+    public static class SectionStatusView {
+        private Long id;
         private String name;
         private int totalProducts;
         private int completedCount;
+
+        @Builder.Default
+        private List<WorkerView> workers = new ArrayList<>();
 
         @Builder.Default
         private List<PendingProductView> pendingProducts = new ArrayList<>();
 
         @Builder.Default
         private List<SubmittedEntryView> entries = new ArrayList<>();
+
+        @Builder.Default
+        private List<EditableProductView> editableProducts = new ArrayList<>();
     }
 
     @Data
@@ -59,10 +63,11 @@ public class AdminOverviewResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ProductAssignmentView {
-        private Long id;
-        private String name;
-        private String assignedWorker;
-        private Integer sortOrder;
+    public static class EditableProductView {
+        private Long productId;
+        private String productName;
+        private Long entryId;
+        private Double quantity;
+        private boolean submitted;
     }
 }

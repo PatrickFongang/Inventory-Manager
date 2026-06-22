@@ -1,5 +1,6 @@
 package com.inventory.demo.service;
 
+import com.inventory.demo.entity.InventoryEntry;
 import com.inventory.demo.entity.Product;
 import com.inventory.demo.repository.InventoryEntryRepository;
 import com.inventory.demo.repository.ProductRepository;
@@ -21,11 +22,9 @@ public class ExportService {
     }
 
     public String buildCsv() {
-        Map<String, Double> totals = new HashMap<>();
-        for (Object[] row : inventoryEntryRepository.sumQuantitiesByProduct()) {
-            String productName = (String) row[0];
-            Double sum = row[1] == null ? 0.0 : ((Number) row[1]).doubleValue();
-            totals.put(productName, sum);
+        Map<String, Double> quantities = new HashMap<>();
+        for (InventoryEntry entry : inventoryEntryRepository.findBySubmittedTrue()) {
+            quantities.put(entry.getProductName(), entry.getQuantity());
         }
 
         List<Product> products = productRepository.findAllByOrderBySortOrderAsc();
@@ -34,7 +33,7 @@ public class ExportService {
         builder.append('\uFEFF');
         builder.append("Produkt;Ilosc\n");
         for (Product product : products) {
-            double quantity = totals.getOrDefault(product.getName(), 0.0);
+            double quantity = quantities.getOrDefault(product.getName(), 0.0);
             builder.append(escape(product.getName()))
                     .append(';')
                     .append(formatQuantity(quantity))

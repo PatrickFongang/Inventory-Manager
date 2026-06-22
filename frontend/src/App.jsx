@@ -7,7 +7,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<WorkerSelect />} />
-      <Route path="/inventory/:worker" element={<Inventory />} />
+      <Route path="/inventory/:workerId" element={<Inventory />} />
       <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<WorkerSelect />} />
     </Routes>

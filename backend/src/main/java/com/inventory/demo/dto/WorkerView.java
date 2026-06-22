@@ -9,13 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkerProductView {
+public class WorkerView {
 
     private Long id;
-    private String name;
-    private String sectionName;
-    private Integer sortOrder;
-    private boolean submitted;
-    private Long entryId;
-    private Double quantity;
+    private String firstName;
+    private String lastName;
+    private boolean workingToday;
 }

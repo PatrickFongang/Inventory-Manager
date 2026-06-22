@@ -5,6 +5,7 @@ import com.inventory.demo.dto.InventoryEntryRequest;
 import com.inventory.demo.dto.UpdateInventoryEntryRequest;
 import com.inventory.demo.entity.InventoryEntry;
 import com.inventory.demo.entity.Product;
+import com.inventory.demo.entity.Section;
 import com.inventory.demo.factory.AdminOverviewFactory;
 import com.inventory.demo.factory.InventoryEntryFactory;
 import com.inventory.demo.repository.InventoryEntryRepository;
@@ -22,11 +23,14 @@ public class InventoryService {
 
     private final InventoryEntryRepository inventoryEntryRepository;
     private final ProductRepository productRepository;
+    private final SectionService sectionService;
 
     public InventoryService(InventoryEntryRepository inventoryEntryRepository,
-                            ProductRepository productRepository) {
+                            ProductRepository productRepository,
+                            SectionService sectionService) {
         this.inventoryEntryRepository = inventoryEntryRepository;
         this.productRepository = productRepository;
+        this.sectionService = sectionService;
     }
 
     @Transactional
@@ -34,15 +38,9 @@ public class InventoryService {
         if (request.getQuantity() == null) {
             throw new IllegalArgumentException("Quantity is required");
         }
-
         Product product = findProduct(request.getProductId());
-        Optional<InventoryEntry> existing = findExistingEntry(request);
-
-        if (existing.isPresent() && existing.get().isSubmitted()) {
-            throw new IllegalArgumentException("Product already submitted: " + request.getProductId());
-        }
-
-        InventoryEntry entry = InventoryEntryFactory.draft(existing, product, request);
+        Optional<InventoryEntry> existing = inventoryEntryRepository.findByProductId(product.getId());
+        InventoryEntry entry = InventoryEntryFactory.draft(existing, product, request.getQuantity());
         return inventoryEntryRepository.save(entry);
     }
 
@@ -54,8 +52,8 @@ public class InventoryService {
                 continue;
             }
             Product product = findProduct(request.getProductId());
-            Optional<InventoryEntry> existing = findExistingEntry(request);
-            entries.add(InventoryEntryFactory.submitted(existing, product, request));
+            Optional<InventoryEntry> existing = inventoryEntryRepository.findByProductId(product.getId());
+            entries.add(InventoryEntryFactory.submitted(existing, product, request.getQuantity()));
         }
         return inventoryEntryRepository.saveAll(entries);
     }
@@ -71,25 +69,42 @@ public class InventoryService {
         return inventoryEntryRepository.save(updated);
     }
 
+    @Transactional
+    public InventoryEntry adminSaveProduct(Long productId, UpdateInventoryEntryRequest request) {
+        if (request.getQuantity() == null) {
+            throw new IllegalArgumentException("Quantity is required");
+        }
+        Product product = findProduct(productId);
+        Optional<InventoryEntry> existing = inventoryEntryRepository.findByProductId(product.getId());
+        InventoryEntry entry = InventoryEntryFactory.submitted(existing, product, request.getQuantity());
+        return inventoryEntryRepository.save(entry);
+    }
+
     public List<InventoryEntry> findAll() {
         return inventoryEntryRepository.findAll();
     }
 
     public AdminOverviewResponse getAdminOverview() {
         List<Product> allProducts = productRepository.findAllByOrderBySortOrderAsc();
-        Map<String, List<Product>> productsByWorker = AdminOverviewFactory.groupProductsByWorker(allProducts);
+        Map<String, List<Product>> productsBySection = AdminOverviewFactory.groupProductsBySection(allProducts);
+        Map<Long, InventoryEntry> entriesByProductId = buildEntryMap();
 
         AdminOverviewResponse response = AdminOverviewResponse.builder().build();
-        for (String worker : productRepository.findDistinctWorkers()) {
-            List<Product> assignedProducts = productsByWorker.getOrDefault(worker, List.of());
-            Map<Long, InventoryEntry> entriesByProductId = buildEntryMap(worker);
-            response.getWorkers().add(
-                    AdminOverviewFactory.workerStatus(worker, assignedProducts, entriesByProductId));
-        }
-        for (Product product : allProducts) {
-            response.getProducts().add(AdminOverviewFactory.productAssignment(product));
+        for (Section section : sectionService.findAllOrderedWithWorkers()) {
+            List<Product> sectionProducts = productsBySection.getOrDefault(section.getName(), List.of());
+            response.getSections().add(
+                    AdminOverviewFactory.sectionStatus(section, sectionProducts, entriesByProductId));
         }
         return response;
+    }
+
+    public List<AdminOverviewResponse.EditableProductView> getEditableProductsForSection(Long sectionId) {
+        Section section = sectionService.findById(sectionId);
+        Map<Long, InventoryEntry> entriesByProductId = buildEntryMap();
+        return productRepository.findBySectionNameOrderBySortOrderAsc(section.getName()).stream()
+                .map(product -> AdminOverviewFactory.editableProduct(
+                        product, entriesByProductId.get(product.getId())))
+                .toList();
     }
 
     @Transactional
@@ -102,17 +117,12 @@ public class InventoryService {
         inventoryEntryRepository.deleteById(id);
     }
 
-    public Map<Long, InventoryEntry> buildEntryMap(String worker) {
+    public Map<Long, InventoryEntry> buildEntryMap() {
         Map<Long, InventoryEntry> entriesByProductId = new HashMap<>();
-        for (InventoryEntry entry : inventoryEntryRepository.findByWorkerName(worker)) {
+        for (InventoryEntry entry : inventoryEntryRepository.findAll()) {
             if (entry.getProductId() != null) {
                 entriesByProductId.put(entry.getProductId(), entry);
-                continue;
             }
-            productRepository.findAllByOrderBySortOrderAsc().stream()
-                    .filter(product -> product.getName().equals(entry.getProductName()))
-                    .findFirst()
-                    .ifPresent(product -> entriesByProductId.putIfAbsent(product.getId(), entry));
         }
         return entriesByProductId;
     }
@@ -120,10 +130,5 @@ public class InventoryService {
     private Product findProduct(Long productId) {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
-    }
-
-    private Optional<InventoryEntry> findExistingEntry(InventoryEntryRequest request) {
-        return inventoryEntryRepository.findByWorkerNameAndProductId(
-                request.getWorkerName(), request.getProductId());
     }
 }

@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,14 +24,11 @@ public class InventoryEntry {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "product_name", nullable = false)
-    private String productName;
-
-    @Column(name = "product_id")
+    @Column(name = "product_id", nullable = false, unique = true)
     private Long productId;
 
-    @Column(name = "worker_name", nullable = false)
-    private String workerName;
+    @Column(name = "product_name", nullable = false)
+    private String productName;
 
     @Column(nullable = false)
     private Double quantity;
@@ -42,9 +40,8 @@ public class InventoryEntry {
     private LocalDateTime timestamp;
 
     @PrePersist
-    public void onCreate() {
-        if (timestamp == null) {
-            timestamp = LocalDateTime.now();
-        }
+    @PreUpdate
+    public void touchTimestamp() {
+        timestamp = LocalDateTime.now();
     }
 }

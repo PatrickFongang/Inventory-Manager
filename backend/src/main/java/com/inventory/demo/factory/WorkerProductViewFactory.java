@@ -13,7 +13,7 @@ public final class WorkerProductViewFactory {
         WorkerProductView.WorkerProductViewBuilder builder = WorkerProductView.builder()
                 .id(product.getId())
                 .name(product.getName())
-                .assignedWorker(product.getAssignedWorker())
+                .sectionName(product.getSectionName())
                 .sortOrder(product.getSortOrder())
                 .submitted(entry != null && entry.isSubmitted());
 

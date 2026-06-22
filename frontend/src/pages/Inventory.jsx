@@ -1,21 +1,81 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { fetchProducts, saveDraft, submitInventory, updateInventoryEntry } from '../api.js'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { fetchProducts, fetchWorkers, saveDraft, submitInventory, updateInventoryEntry } from '../api.js'
+import { formatWorkerShort } from '../workerName.js'
 import Spinner from '../components/Spinner.jsx'
 import StatusScreen from '../components/StatusScreen.jsx'
 import QuantityControl, { parseQuantity } from '../components/QuantityControl.jsx'
+import BatchQuantityPanel from '../components/BatchQuantityPanel.jsx'
 
 const AUTOSAVE_DELAY = 600
 
+function ProductCard({
+  product,
+  variant,
+  sectionName,
+  quantity,
+  productBatches,
+  submitState,
+  onChange,
+  onStep,
+  onOpenBatch,
+  onAddBatch,
+  onRemoveBatch,
+  onClearBatches,
+  onSaveSubmitted,
+}) {
+  const borderClass = variant === 'submitted'
+    ? 'border-amber-800/60 bg-amber-950/30'
+    : product.entryId
+      ? 'border-sky-800/60 bg-sky-950/20'
+      : 'border-slate-800 bg-slate-800/60'
+
+  return (
+    <div className={'rounded-3xl border p-5 ' + borderClass}>
+      {!sectionName && product.sectionName && (
+        <p className="mb-1 text-center text-sm text-slate-500">{product.sectionName}</p>
+      )}
+      <p className="mb-4 text-center text-xl font-bold text-slate-100">{product.name}</p>
+      <QuantityControl
+        value={quantity}
+        onChange={onChange}
+        onStep={onStep}
+      />
+      {variant === 'pending' && (
+        <BatchQuantityPanel
+          value={quantity}
+          batches={productBatches}
+          onOpen={onOpenBatch}
+          onAddBatch={onAddBatch}
+          onRemoveBatch={onRemoveBatch}
+          onClearBatches={onClearBatches}
+        />
+      )}
+      {variant === 'submitted' && (
+        <button
+          onClick={onSaveSubmitted}
+          disabled={submitState === 'sending'}
+          className="mt-4 w-full rounded-2xl bg-amber-600 px-6 py-4 text-lg font-bold text-white active:bg-amber-700 disabled:opacity-50"
+        >
+          ZAPISZ ZMIANĘ
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function Inventory() {
-  const { worker } = useParams()
-  const workerName = decodeURIComponent(worker)
+  const { workerId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const saveTimers = useRef({})
 
+  const [workerName, setWorkerName] = useState(location.state?.workerDisplayName ?? '')
+  const [sectionName, setSectionName] = useState(location.state?.sectionName ?? '')
   const [pendingProducts, setPendingProducts] = useState([])
   const [submittedProducts, setSubmittedProducts] = useState([])
   const [quantities, setQuantities] = useState({})
+  const [batches, setBatches] = useState({})
   const [status, setStatus] = useState('loading')
   const [submitState, setSubmitState] = useState('idle')
   const [saveState, setSaveState] = useState('idle')
@@ -24,10 +84,26 @@ export default function Inventory() {
 
   function load() {
     setStatus('loading')
-    fetchProducts(workerName)
-      .then((data) => {
-        const pending = data.filter((product) => !product.submitted)
-        const submitted = data.filter((product) => product.submitted)
+    const productsPromise = fetchProducts(workerId)
+    const namePromise = workerName
+      ? Promise.resolve(workerName)
+      : fetchWorkers().then((workers) => {
+          const found = workers.find((w) => String(w.id) === String(workerId))
+          return found ? formatWorkerShort(found) : 'Pracownik'
+        })
+
+    Promise.all([productsPromise, namePromise])
+      .then(([data, name]) => {
+        setWorkerName(name)
+        const activeSection = location.state?.sectionName ?? sectionName
+        const scoped = activeSection
+          ? data.filter((product) => product.sectionName === activeSection)
+          : data
+        if (activeSection) {
+          setSectionName(activeSection)
+        }
+        const pending = scoped.filter((product) => !product.submitted)
+        const submitted = scoped.filter((product) => product.submitted)
         const initial = {}
         pending.forEach((product) => {
           initial[product.id] = product.entryId
@@ -40,6 +116,7 @@ export default function Inventory() {
         setPendingProducts(pending)
         setSubmittedProducts(submitted)
         setQuantities(initial)
+        setBatches({})
         setSaveState('idle')
         setStatus('ready')
       })
@@ -51,14 +128,13 @@ export default function Inventory() {
     return () => {
       Object.values(saveTimers.current).forEach(clearTimeout)
     }
-  }, [workerName])
+  }, [workerId])
 
   function scheduleAutoSave(productId, value) {
     clearTimeout(saveTimers.current[productId])
     setSaveState('saving')
     saveTimers.current[productId] = setTimeout(() => {
       saveDraft({
-        workerName,
         productId,
         quantity: parseQuantity(value),
       })
@@ -76,14 +152,54 @@ export default function Inventory() {
     }, AUTOSAVE_DELAY)
   }
 
-  function setValue(id, value) {
+  function setValue(id, value, fromBatch = false) {
     setQuantities((prev) => ({ ...prev, [id]: value }))
+    if (!fromBatch) {
+      setBatches((prev) => {
+        if (!prev[id]?.length) {
+          return prev
+        }
+        return { ...prev, [id]: [] }
+      })
+    }
     if (pendingProducts.some((product) => product.id === id)) {
       scheduleAutoSave(id, value)
     }
   }
 
+  function applyBatchTotal(productId, nextBatches) {
+    const total = nextBatches.reduce((sum, amount) => sum + amount, 0)
+    setBatches((prev) => ({ ...prev, [productId]: nextBatches }))
+    setValue(productId, String(total), true)
+  }
+
+  function addBatch(productId, amount) {
+    const current = batches[productId] ?? []
+    applyBatchTotal(productId, [...current, amount])
+  }
+
+  function removeBatch(productId, index) {
+    const current = batches[productId] ?? []
+    applyBatchTotal(
+      productId,
+      current.filter((_, i) => i !== index),
+    )
+  }
+
+  function clearBatches(productId) {
+    applyBatchTotal(productId, [])
+  }
+
+  function openBatchMode(productId) {
+    const current = parseQuantity(quantities[productId])
+    const currentBatches = batches[productId] ?? []
+    if (current > 0 && currentBatches.length === 0) {
+      applyBatchTotal(productId, [current])
+    }
+  }
+
   function step(id, delta) {
+    setBatches((prev) => ({ ...prev, [id]: [] }))
     setQuantities((prev) => {
       const next = parseQuantity(prev[id]) + delta
       const value = String(next < 0 ? 0 : next)
@@ -102,7 +218,6 @@ export default function Inventory() {
     }
     setSubmitState('sending')
     const entries = productsToSubmit.map((product) => ({
-      workerName,
       productId: product.id,
       quantity: parseQuantity(quantities[product.id]),
     }))
@@ -185,8 +300,17 @@ export default function Inventory() {
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-slate-400">Pracownik</p>
-          <h1 className="truncate text-xl font-bold text-slate-100">{workerName}</h1>
+          {sectionName ? (
+            <>
+              <h1 className="truncate text-2xl font-extrabold text-slate-100">{workerName}</h1>
+              <p className="truncate text-sm text-slate-400">{sectionName}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-400">Pracownik</p>
+              <h1 className="truncate text-xl font-bold text-slate-100">{workerName}</h1>
+            </>
+          )}
           {saveState === 'saving' && (
             <p className="text-xs text-slate-500">Zapisywanie...</p>
           )}
@@ -217,37 +341,34 @@ export default function Inventory() {
           </div>
         )}
 
+        {pendingProducts.length === 0 && submittedProducts.length === 0 && (
+          <p className="mt-12 text-center text-lg text-slate-400">
+            Brak produktów przypisanych do Twoich sekcji. Poproś koordynatora o przypisanie.
+          </p>
+        )}
+
         {showSubmitted && submittedProducts.length > 0 && (
           <section className="mb-6">
             <h2 className="mb-3 text-lg font-bold text-amber-300">Wysłane — edycja</h2>
             <div className="flex flex-col gap-4">
               {submittedProducts.map((product) => (
-                <div
+                <ProductCard
                   key={product.id}
-                  className="rounded-3xl border border-amber-800/60 bg-amber-950/30 p-5"
-                >
-                  <p className="mb-4 text-center text-xl font-bold text-slate-100">
-                    {product.name}
-                  </p>
-                  <QuantityControl
-                    value={quantities[product.id]}
-                    onChange={(value) => setValue(product.id, value)}
-                    onStep={(delta) => step(product.id, delta)}
-                  />
-                  <button
-                    onClick={() => handleSaveSubmitted(product)}
-                    disabled={submitState === 'sending'}
-                    className="mt-4 w-full rounded-2xl bg-amber-600 px-6 py-4 text-lg font-bold text-white active:bg-amber-700 disabled:opacity-50"
-                  >
-                    ZAPISZ ZMIANĘ
-                  </button>
-                </div>
+                  product={product}
+                  variant="submitted"
+                  sectionName={sectionName}
+                  quantity={quantities[product.id]}
+                  submitState={submitState}
+                  onChange={(value) => setValue(product.id, value)}
+                  onStep={(delta) => step(product.id, delta)}
+                  onSaveSubmitted={() => handleSaveSubmitted(product)}
+                />
               ))}
             </div>
           </section>
         )}
 
-        {!showSubmitted && (
+        {!showSubmitted && pendingProducts.length > 0 && (
           <section>
             <h2 className="mb-3 text-lg font-bold text-sky-300">
               Do policzenia ({pendingProducts.length})
@@ -257,33 +378,25 @@ export default function Inventory() {
                 Przywrócono {draftCount} zapisanych wcześniej produktów.
               </p>
             )}
-            {pendingProducts.length === 0 ? (
-              <p className="mt-8 text-center text-lg text-slate-400">
-                Brak produktów do policzenia.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {pendingProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className={'rounded-3xl border p-5 ' + (
-                      product.entryId
-                        ? 'border-sky-800/60 bg-sky-950/20'
-                        : 'border-slate-800 bg-slate-800/60'
-                    )}
-                  >
-                    <p className="mb-4 text-center text-xl font-bold text-slate-100">
-                      {product.name}
-                    </p>
-                    <QuantityControl
-                      value={quantities[product.id]}
-                      onChange={(value) => setValue(product.id, value)}
-                      onStep={(delta) => step(product.id, delta)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-col gap-4">
+              {pendingProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  variant="pending"
+                  sectionName={sectionName}
+                  quantity={quantities[product.id]}
+                  productBatches={batches[product.id] ?? []}
+                  submitState={submitState}
+                  onChange={(value) => setValue(product.id, value)}
+                  onStep={(delta) => step(product.id, delta)}
+                  onOpenBatch={() => openBatchMode(product.id)}
+                  onAddBatch={(amount) => addBatch(product.id, amount)}
+                  onRemoveBatch={(index) => removeBatch(product.id, index)}
+                  onClearBatches={() => clearBatches(product.id)}
+                />
+              ))}
+            </div>
           </section>
         )}
       </div>

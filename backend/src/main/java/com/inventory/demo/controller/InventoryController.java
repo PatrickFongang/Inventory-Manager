@@ -1,15 +1,19 @@
 package com.inventory.demo.controller;
 
 import com.inventory.demo.dto.AdminOverviewResponse;
+import com.inventory.demo.dto.CreateWorkerRequest;
 import com.inventory.demo.dto.InventoryEntryRequest;
+import com.inventory.demo.dto.SectionView;
 import com.inventory.demo.dto.UpdateInventoryEntryRequest;
-import com.inventory.demo.dto.UpdateProductAssignmentRequest;
+import com.inventory.demo.dto.UpdateWorkerWorkingTodayRequest;
 import com.inventory.demo.dto.WorkerProductView;
+import com.inventory.demo.dto.WorkerView;
 import com.inventory.demo.entity.InventoryEntry;
-import com.inventory.demo.entity.Product;
 import com.inventory.demo.service.ExportService;
 import com.inventory.demo.service.InventoryService;
 import com.inventory.demo.service.ProductService;
+import com.inventory.demo.service.SectionService;
+import com.inventory.demo.service.WorkerService;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
@@ -31,27 +35,67 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 public class InventoryController {
 
+    private final WorkerService workerService;
     private final ProductService productService;
+    private final SectionService sectionService;
     private final InventoryService inventoryService;
     private final ExportService exportService;
 
-    public InventoryController(ProductService productService,
+    public InventoryController(WorkerService workerService,
+                               ProductService productService,
+                               SectionService sectionService,
                                InventoryService inventoryService,
                                ExportService exportService) {
+        this.workerService = workerService;
         this.productService = productService;
+        this.sectionService = sectionService;
         this.inventoryService = inventoryService;
         this.exportService = exportService;
     }
 
     @GetMapping("/workers")
-    public List<String> getWorkers() {
-        return productService.getWorkers();
+    public List<WorkerView> getWorkers(@RequestParam(required = false) String search) {
+        return workerService.findAll(search);
+    }
+
+    @PostMapping("/workers")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WorkerView createWorker(@RequestBody CreateWorkerRequest request) {
+        return workerService.create(request);
+    }
+
+    @PutMapping("/workers/{id}/working-today")
+    public WorkerView updateWorkerWorkingToday(@PathVariable Long id,
+                                               @RequestBody UpdateWorkerWorkingTodayRequest request) {
+        return workerService.updateWorkingToday(id, request.isWorkingToday());
+    }
+
+    @PostMapping("/workers/reset-working-today")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetWorkersWorkingToday() {
+        workerService.resetAllWorkingToday();
+    }
+
+    @DeleteMapping("/workers/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteWorker(@PathVariable Long id) {
+        workerService.delete(id);
+    }
+
+    @GetMapping("/sections")
+    public List<SectionView> getSections(@RequestParam(required = false) Boolean activeOnly) {
+        return sectionService.findAllViews(Boolean.TRUE.equals(activeOnly));
+    }
+
+    @PutMapping("/sections/{id}/workers")
+    public SectionView updateSectionWorkers(@PathVariable Long id, @RequestBody List<Long> workerIds) {
+        return sectionService.updateWorkers(id, workerIds);
     }
 
     @GetMapping("/products")
-    public List<WorkerProductView> getProducts(@RequestParam String worker,
+    public List<WorkerProductView> getProducts(@RequestParam Long workerId,
                                                @RequestParam(required = false) Boolean pendingOnly) {
-        return productService.getProductsForWorkerWithStatus(worker, pendingOnly);
+        return productService.getProductsForWorkerWithStatus(workerId, pendingOnly);
     }
 
     @PostMapping("/inventory/draft")
@@ -69,6 +113,12 @@ public class InventoryController {
     public InventoryEntry updateInventoryEntry(@PathVariable Long id,
                                                @RequestBody UpdateInventoryEntryRequest request) {
         return inventoryService.updateEntry(id, request);
+    }
+
+    @PutMapping("/inventory/product/{productId}")
+    public InventoryEntry adminSaveProduct(@PathVariable Long productId,
+                                           @RequestBody UpdateInventoryEntryRequest request) {
+        return inventoryService.adminSaveProduct(productId, request);
     }
 
     @GetMapping("/inventory")
@@ -93,10 +143,9 @@ public class InventoryController {
         return inventoryService.getAdminOverview();
     }
 
-    @PutMapping("/products/{id}")
-    public Product updateProductAssignment(@PathVariable Long id,
-                                           @RequestBody UpdateProductAssignmentRequest request) {
-        return productService.updateAssignment(id, request.getAssignedWorker());
+    @GetMapping("/admin/sections/{id}/products")
+    public List<AdminOverviewResponse.EditableProductView> getSectionProducts(@PathVariable Long id) {
+        return inventoryService.getEditableProductsForSection(id);
     }
 
     @GetMapping("/export")

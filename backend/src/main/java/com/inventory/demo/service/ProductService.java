@@ -3,6 +3,7 @@ package com.inventory.demo.service;
 import com.inventory.demo.dto.WorkerProductView;
 import com.inventory.demo.entity.InventoryEntry;
 import com.inventory.demo.entity.Product;
+import com.inventory.demo.entity.Section;
 import com.inventory.demo.factory.WorkerProductViewFactory;
 import com.inventory.demo.repository.ProductRepository;
 import java.util.List;
@@ -14,37 +15,33 @@ import org.springframework.stereotype.Service;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final SectionService sectionService;
     private final InventoryService inventoryService;
 
     public ProductService(ProductRepository productRepository,
+                          SectionService sectionService,
                           InventoryService inventoryService) {
         this.productRepository = productRepository;
+        this.sectionService = sectionService;
         this.inventoryService = inventoryService;
     }
 
-    public List<String> getWorkers() {
-        return productRepository.findDistinctWorkers();
-    }
+    public List<WorkerProductView> getProductsForWorkerWithStatus(Long workerId, Boolean pendingOnly) {
+        List<String> sectionNames = sectionService.findSectionsForWorker(workerId).stream()
+                .map(Section::getName)
+                .toList();
 
-    public List<Product> getProductsForWorker(String worker) {
-        return productRepository.findByAssignedWorkerOrderBySortOrderAsc(worker);
-    }
+        if (sectionNames.isEmpty()) {
+            return List.of();
+        }
 
-    public List<WorkerProductView> getProductsForWorkerWithStatus(String worker, Boolean pendingOnly) {
-        List<Product> products = productRepository.findByAssignedWorkerOrderBySortOrderAsc(worker);
-        Map<Long, InventoryEntry> entriesByProductId = inventoryService.buildEntryMap(worker);
+        List<Product> products = productRepository.findBySectionNameInOrderBySortOrderAsc(sectionNames);
+        Map<Long, InventoryEntry> entriesByProductId = inventoryService.buildEntryMap();
 
         return products.stream()
                 .map(product -> WorkerProductViewFactory.fromProduct(
                         product, entriesByProductId.get(product.getId())))
                 .filter(view -> pendingOnly == null || !pendingOnly || !view.isSubmitted())
                 .collect(Collectors.toList());
-    }
-
-    public Product updateAssignment(Long productId, String assignedWorker) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
-        product.setAssignedWorker(assignedWorker);
-        return productRepository.save(product);
     }
 }

@@ -7,16 +7,89 @@ async function handleResponse(response) {
   return response
 }
 
-export async function fetchWorkers() {
-  const response = await fetch('/api/workers', {
+export async function fetchWorkers(search) {
+  let url = '/api/workers'
+  if (search) {
+    url += '?search=' + encodeURIComponent(search)
+  }
+  const response = await fetch(url, {
     headers: NGROK_HEADERS,
   })
   await handleResponse(response)
   return response.json()
 }
 
-export async function fetchProducts(worker, pendingOnly) {
-  let url = '/api/products?worker=' + encodeURIComponent(worker)
+export async function createWorker(firstName, lastName) {
+  const response = await fetch('/api/workers', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify({ firstName, lastName }),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function updateWorkerWorkingToday(workerId, workingToday) {
+  const response = await fetch('/api/workers/' + workerId + '/working-today', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify({ workingToday }),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function resetWorkersWorkingToday() {
+  const response = await fetch('/api/workers/reset-working-today', {
+    method: 'POST',
+    headers: NGROK_HEADERS,
+  })
+  await handleResponse(response)
+  return true
+}
+
+export async function deleteWorker(workerId) {
+  const response = await fetch('/api/workers/' + workerId, {
+    method: 'DELETE',
+    headers: NGROK_HEADERS,
+  })
+  await handleResponse(response)
+  return true
+}
+
+export async function fetchSections(activeOnly) {
+  let url = '/api/sections'
+  if (activeOnly) {
+    url += '?activeOnly=true'
+  }
+  const response = await fetch(url, {
+    headers: NGROK_HEADERS,
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function updateSectionWorkers(sectionId, workerIds) {
+  const response = await fetch('/api/sections/' + sectionId + '/workers', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(workerIds),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
+export async function fetchProducts(workerId, pendingOnly) {
+  let url = '/api/products?workerId=' + workerId
   if (pendingOnly !== undefined) {
     url += '&pendingOnly=' + pendingOnly
   }
@@ -66,6 +139,19 @@ export async function updateInventoryEntry(entryId, quantity) {
   return response.json()
 }
 
+export async function adminSaveProduct(productId, quantity) {
+  const response = await fetch('/api/inventory/product/' + productId, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify({ quantity }),
+  })
+  await handleResponse(response)
+  return response.json()
+}
+
 export async function fetchAdminOverview() {
   const response = await fetch('/api/admin/overview', {
     headers: NGROK_HEADERS,
@@ -74,14 +160,9 @@ export async function fetchAdminOverview() {
   return response.json()
 }
 
-export async function updateProductAssignment(productId, assignedWorker) {
-  const response = await fetch('/api/products/' + productId, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...NGROK_HEADERS,
-    },
-    body: JSON.stringify({ assignedWorker }),
+export async function fetchSectionProducts(sectionId) {
+  const response = await fetch('/api/admin/sections/' + sectionId + '/products', {
+    headers: NGROK_HEADERS,
   })
   await handleResponse(response)
   return response.json()
