@@ -24,9 +24,11 @@ export default function AdminLogin({ onSuccess }) {
         <p className="mt-2 text-lg text-slate-400">Wprowadź hasło</p>
       </header>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
+      <form onSubmit={handleSubmit} autoComplete="on" className="w-full max-w-sm flex flex-col gap-4">
         <input
           type="password"
+          name="inventory-coordinator-password"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Hasło"

@@ -1,6 +1,7 @@
 package com.inventory.demo.controller;
 
 import com.inventory.demo.dto.AdminOverviewResponse;
+import com.inventory.demo.dto.FeedbackRequest;
 import com.inventory.demo.dto.CreateWorkerRequest;
 import com.inventory.demo.dto.InventoryEntryRequest;
 import com.inventory.demo.dto.SectionView;
@@ -10,6 +11,7 @@ import com.inventory.demo.dto.WorkerProductView;
 import com.inventory.demo.dto.WorkerView;
 import com.inventory.demo.entity.InventoryEntry;
 import com.inventory.demo.service.ExportService;
+import com.inventory.demo.service.FeedbackService;
 import com.inventory.demo.service.InventoryService;
 import com.inventory.demo.service.ProductService;
 import com.inventory.demo.service.SectionService;
@@ -40,17 +42,20 @@ public class InventoryController {
     private final SectionService sectionService;
     private final InventoryService inventoryService;
     private final ExportService exportService;
+    private final FeedbackService feedbackService;
 
     public InventoryController(WorkerService workerService,
                                ProductService productService,
                                SectionService sectionService,
                                InventoryService inventoryService,
-                               ExportService exportService) {
+                               ExportService exportService,
+                               FeedbackService feedbackService) {
         this.workerService = workerService;
         this.productService = productService;
         this.sectionService = sectionService;
         this.inventoryService = inventoryService;
         this.exportService = exportService;
+        this.feedbackService = feedbackService;
     }
 
     @GetMapping("/workers")
@@ -146,6 +151,12 @@ public class InventoryController {
     @GetMapping("/admin/sections/{id}/products")
     public List<AdminOverviewResponse.EditableProductView> getSectionProducts(@PathVariable Long id) {
         return inventoryService.getEditableProductsForSection(id);
+    }
+
+    @PostMapping("/feedback")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void submitFeedback(@RequestBody FeedbackRequest request) {
+        feedbackService.save(request);
     }
 
     @GetMapping("/export")

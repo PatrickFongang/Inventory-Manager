@@ -192,3 +192,16 @@ export async function resetInventory() {
   await handleResponse(response)
   return true
 }
+
+export async function submitFeedback(payload) {
+  const response = await fetch('/api/feedback', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(payload),
+  })
+  await handleResponse(response)
+  return true
+}
